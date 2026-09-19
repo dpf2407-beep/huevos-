@@ -1,0 +1,155 @@
+import os
+import asyncio
+import webbrowser
+import google.generativeai as genai
+
+# =========================================================
+# 1. Configuración de la API de Gemini
+# =========================================================
+# Reemplaza 'TU_API_KEY_AQUI' con la clave de Google AI Studio
+API_KEY = "TU_API_KEY_AQUI"
+genai.configure(api_key=API_KEY)
+
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    system_instruction=(
+        "Eres JARVIS, la IA personal de Tony Stark adaptada para sistemas iPadOS. "
+        "Tu tono es extremadamente formal, refinado, eficiente y servicial. "
+        "Dirígete siempre al usuario como 'Señor'. "
+        "Proporciona respuestas breves, precisas y directas al grano."
+    )
+)
+
+# =========================================================
+# 2. Generación de Voz de Salida (TTS para iPadOS)
+# =========================================================
+async def hablar(texto):
+    """
+    Convierte el texto en audio con voz grave y elegante, 
+    y lo reproduce mediante el comando nativo de a-Shell ('play').
+    """
+    voice = "es-ES-AlvaroNeural"  # Voz masculina en español
+    output_file = "respuesta_jarvis.mp3"
+    
+    try:
+        communicate = edge_tts.Communicate(texto, voice)
+        await communicate.save(output_file)
+        
+        # El comando 'play' reproduce el audio nativamente en a-Shell / iPadOS
+        os.system(f"play {output_file}")
+        
+    except Exception as e:
+        print(f"[Error de Audio]: {e}")
+    finally:
+        if os.path.exists(output_file):
+            os.remove(output_file)
+
+# =========================================================
+# 3. Comandos y Control de Aplicaciones en iPadOS
+# =========================================================
+def ejecutar_comando_ipad(comando):
+    """
+    Detecta intenciones específicas para abrir aplicaciones,
+    buscar contenido o ejecutar automatizaciones mediante URL Schemes.
+    """
+    comando = comando.lower()
+
+    # Reproducción de música o vídeos
+    if "reproduce" in comando or "pon música" in comando:
+        busqueda = (
+            comando.replace("reproduce", "")
+            .replace("pon música de", "")
+            .replace("pon música", "")
+            .replace("de", "")
+            .strip()
+        )
+        url = f"https://www.youtube.com/results?search_query={busqueda}"
+        webbrowser.open(url)
+        return f"Buscando {busqueda} para usted, Señor."
+
+    # Abrir aplicaciones mediante esquemas URL de iPadOS
+    elif "abre youtube" in comando:
+        webbrowser.open("youtube://")
+        return "Abriendo la aplicación de YouTube, Señor."
+
+    elif "abre spotify" in comando:
+        webbrowser.open("spotify://")
+        return "Iniciando Spotify, Señor."
+
+    elif "abre safari" in comando or "abre el navegador" in comando:
+        webbrowser.open("https://www.google.com")
+        return "Navegador listo, Señor."
+
+    # Realizar búsquedas en la web
+    elif "busca en google" in comando or "busca en la web" in comando:
+        consulta = (
+            comando.replace("busca en google", "")
+            .replace("busca en la web", "")
+            .strip()
+        )
+        webbrowser.open(f"https://www.google.com/search?q={consulta}")
+        return f"Realizando búsqueda sobre {consulta}, Señor."
+
+    # Integración con la app 'Atajos' (Shortcuts) de Apple
+    elif "ejecuta atajo" in comando or "corre el atajo" in comando:
+        nombre_atajo = (
+            comando.replace("ejecuta atajo", "")
+            .replace("corre el atajo", "")
+            .strip()
+        )
+        # Activa cualquier atajo creado en tu iPad
+        webbrowser.open(f"shortcuts://run-shortcut?name={nombre_atajo}")
+        return f"Ejecutando el atajo '{nombre_atajo}', Señor."
+
+    return None
+
+# =========================================================
+# 4. Bucle Principal de Interacción
+# =========================================================
+async def main():
+    print("=" * 50)
+    print("  INICIANDO SISTEMAS JARVIS (VERSIÓN IPADOS)")
+    print("=" * 50)
+    
+    await hablar("Sistemas de iPadOS integrados, Señor. Todos los módulos en línea.")
+
+    while True:
+        try:
+            print("\n--------------------------------------------------")
+            print("💡 Toca el micrófono del teclado en pantalla para dictar.")
+            comando_usuario = input("Usted: ").strip()
+
+            if not comando_usuario:
+                continue
+
+            # Comandos de apagado
+            if "desconectar" in comando_usuario.lower() or "salir" in comando_usuario.lower():
+                await hablar("Entendido, Señor. Apagando sistemas. Tenga un buen día.")
+                break
+
+            # 1. Comprobar si es un comando local de iPadOS
+            respuesta_local = ejecutar_comando_ipad(comando_usuario)
+
+            if respuesta_local:
+                print(f"JARVIS: {respuesta_local}")
+                await hablar(respuesta_local)
+            else:
+                # 2. Si no es un comando local, procesar con la IA de Gemini
+                response = model.generate_content(comando_usuario)
+                respuesta_ia = response.text
+
+                print(f"JARVIS: {respuesta_ia}")
+                await hablar(respuesta_ia)
+
+        except KeyboardInterrupt:
+            print("\nApagado manual detectado.")
+            break
+        except Exception as e:
+            print(f"Error en la ejecución: {e}")
+            await hablar("He detectado una leve anomalía en mi procesamiento, Señor.")
+
+# =========================================================
+# 5. Punto de Entrada
+# =========================================================
+if __name__ == "__main__":
+    asyncio.run(main())
